@@ -1,0 +1,542 @@
+// Prisma Schema for Mandi Express Backend
+// Compliant with AGENTS.md Security & Clean Architecture Standards
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserRole {
+  FARMER
+  TRANSPORTER
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransporterStatus {
+  AVAILABLE
+  ON_TRIP
+  INACTIVE
+}
+
+enum SampleStatus {
+  PENDING_COLLECTION
+  COLLECTION_ASSIGNED
+  SAMPLE_COLLECTED
+  APPROVED
+  REJECTED
+}
+
+enum EnquiryStatus {
+  SUBMITTED
+  ADMIN_ACCEPTED
+  ADMIN_REJECTED
+  TRANSPORTER_ASSIGNED
+  TRANSPORTER_ACCEPTED
+  TRANSPORTER_REJECTED
+  PICKUP
+  IN_TRANSIT
+  ON_DESTINATION
+  DELIVERED
+  PAYMENT_COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum TripStatus {
+  ASSIGNED
+  ACCEPTED
+  PICKUP
+  IN_TRANSIT
+  ON_DESTINATION
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum NotificationType {
+  ENQUIRY_UPDATE
+  TRIP_ASSIGNED
+  PAYMENT_RECEIVED
+  SYSTEM
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model User {
+  id           String    @id @default(cuid())
+  phone        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  // Extended Profiles
+  farmerProfile       FarmerProfile?
+  transporterProfile  TransporterProfile?
+  
+  // Relations
+  refreshTokens       RefreshToken[]
+  createdEnquiries    Enquiry[]              @relation("FarmerEnquiries")
+  assignedEnquiries   TransportAssignment[]  @relation("AssignedTransporter")
+  assignedTrips       Trip[]                 @relation("TransporterTrips")
+  auditLogs           AuditLog[]             @relation("ActorAuditLogs")
+  notifications       Notification[]
+  adminPricings       TransportPricing[]     @relation("AdminPricings")
+  adminLabourPricings LabourPricing[]        @relation("AdminLabourPricings")
+  mandiPrices         MandiPrice[]           @relation("AdminMandiPrices")
+
+  @@index([phone])
+  @@index([role])
+  @@index([isActive])
+}
+
+model FarmerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address   String?
+  village   String?
+  district  String?
+  state     String?
+  pincode   String?
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TransporterProfile {
+  id              String            @id @default(cuid())
+  userId          String            @unique
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber   String?
+  licensePhotoUrl String?
+  aadhaarNumber   String?
+  aadhaarFrontUrl String?
+  aadhaarBackUrl  String?
+  kycStatus       KycStatus         @default(PENDING)
+  isVerified      Boolean           @default(false)
+  rejectionReason String?
+  verifiedAt      DateTime?
+  address         String?
+  latitude        Decimal?          @db.Decimal(10, 8)
+  longitude       Decimal?          @db.Decimal(11, 8)
+  status          TransporterStatus @default(AVAILABLE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  vehicles        Vehicle[]
+
+  @@index([status])
+  @@index([kycStatus])
+  @@index([isVerified])
+}
+
+model Vehicle {
+  id                   String             @id @default(cuid())
+  transporterProfileId String
+  transporterProfile   TransporterProfile @relation(fields: [transporterProfileId], references: [id], onDelete: Cascade)
+  registrationNumber   String             @unique
+  vehicleType          String             // e.g. Tractor, Pickup, Eicher 14ft, 10-Wheeler
+  capacityTonnes       Decimal            @db.Decimal(10, 2)
+  isActive             Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  trips                Trip[]
+  enquiries            Enquiry[]          @relation("PreferredVehicle")
+
+  @@index([transporterProfileId])
+  @@index([vehicleType])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  userAgent String?
+  ipAddress String?
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Enquiry {
+  id                   String        @id @default(cuid())
+  enquiryNumber        String        @unique // ENQ-YYYYMMDD-XXXX
+  farmerId             String
+  farmer               User          @relation("FarmerEnquiries", fields: [farmerId], references: [id], onDelete: Cascade)
+  
+  pickupLocation       String
+  pickupLatitude       Decimal?      @db.Decimal(10, 8)
+  pickupLongitude      Decimal?      @db.Decimal(11, 8)
+  
+  destinationLocation  String
+  destinationLatitude  Decimal?      @db.Decimal(10, 8)
+  destinationLongitude Decimal?      @db.Decimal(11, 8)
+  
+  materialName         String        // Crop/Material name (e.g. Wheat, Paddy, Potato)
+  quantityKg           Decimal       @db.Decimal(10, 2)
+  
+  vehicleTypeId        String?
+  preferredVehicle     Vehicle?      @relation("PreferredVehicle", fields: [vehicleTypeId], references: [id], onDelete: SetNull)
+  vehicleRequirement   String?       // Description or requested vehicle type
+  
+  pickupDate           DateTime
+  preferredTimeSlot    String?
+  
+  labourRequired       Boolean       @default(false)
+  notes                String?
+  
+  status               EnquiryStatus @default(SUBMITTED)
+  isReturnLoad         Boolean       @default(false)
+
+  // Sell from Farm (Ghar Se Beche) & Sample Quality Fields
+  isSellFromFarm       Boolean       @default(false)
+  sampleStatus         SampleStatus?
+  samplePreferredDate  DateTime?
+  samplePreferredSlot  String?
+  sampleCollectorNotes String?
+  sampleCollectedAt    DateTime?
+  labReportImageUrl    String?
+  labRemarks           String?
+  quotedPricePerQtl    Decimal?      @db.Decimal(10, 2)
+  distanceFromRewariKm Decimal?      @db.Decimal(10, 2)
+  
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  deletedAt            DateTime?
+
+  // Relations
+  transportPricing     TransportPricing?
+  enquiryLabours       EnquiryLabour[]
+  assignments          TransportAssignment[]
+  trips                Trip[]
+  payments             Payment[]
+  statusHistory        EnquiryStatusHistory[]
+  returnLoads          ReturnLoad[]
+
+  @@index([farmerId])
+  @@index([farmerId, status, deletedAt])
+  @@index([farmerId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([status, deletedAt])
+  @@index([isSellFromFarm, sampleStatus])
+  @@index([deletedAt, createdAt(sort: Desc)])
+  @@index([pickupDate])
+  @@index([isReturnLoad])
+}
+
+model VehicleRateCard {
+  id              String   @id @default(cuid())
+  category        String   @unique // SUPER_CARRY, PICKUP, TRACTOR_TROLLY, CANTER
+  displayName     String   // Super Carry, Pick-up, Tractor Trolley, Canter
+  capacityMinQtl  Decimal  @db.Decimal(10, 2)
+  capacityMaxQtl  Decimal  @db.Decimal(10, 2)
+  basicFreight    Decimal  @db.Decimal(10, 2)
+  ratePerKm       Decimal  @db.Decimal(10, 2)
+  platformFeePct  Decimal  @default(15.00) @db.Decimal(5, 2) // 15%
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category, isActive])
+}
+
+model LabourType {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g. Loading, Unloading, Packaging, Sorting
+  description String?
+  basePrice   Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  enquiryLabours EnquiryLabour[]
+  labourPricings LabourPricing[]
+}
+
+model AreaLabourCoverage {
+  id          String   @id @default(cuid())
+  areaName    String   @unique
+  district    String
+  state       String
+  isAvailable Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([state, district])
+  @@index([isAvailable])
+}
+
+model EnquiryLabour {
+  id           String      @id @default(cuid())
+  enquiryId    String
+  enquiry      Enquiry     @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  labourTypeId String
+  labourType   LabourType  @relation(fields: [labourTypeId], references: [id], onDelete: Restrict)
+  quantity     Int         @default(1)
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  labourPricing LabourPricing?
+
+  @@unique([enquiryId, labourTypeId])
+}
+
+model TransportPricing {
+  id             String   @id @default(cuid())
+  enquiryId      String   @unique
+  enquiry        Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  adminId        String
+  admin          User     @relation("AdminPricings", fields: [adminId], references: [id], onDelete: Cascade)
+  
+  transportPrice Decimal  @db.Decimal(10, 2)
+  labourPrice    Decimal  @default(0.00) @db.Decimal(10, 2)
+  totalAmount    Decimal  @db.Decimal(10, 2) // transportPrice + labourPrice
+  
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([adminId])
+}
+
+model LabourPricing {
+  id               String        @id @default(cuid())
+  enquiryLabourId  String        @unique
+  enquiryLabour    EnquiryLabour @relation(fields: [enquiryLabourId], references: [id], onDelete: Cascade)
+  labourTypeId     String
+  labourType       LabourType    @relation(fields: [labourTypeId], references: [id], onDelete: Restrict)
+  adminId          String
+  admin            User          @relation("AdminLabourPricings", fields: [adminId], references: [id], onDelete: Cascade)
+  
+  unitPrice        Decimal       @db.Decimal(10, 2)
+  totalLabourPrice Decimal       @db.Decimal(10, 2) // unitPrice * quantity
+  
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model TransportAssignment {
+  id              String           @id @default(cuid())
+  enquiryId       String
+  enquiry         Enquiry          @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  transporterId   String
+  transporter     User             @relation("AssignedTransporter", fields: [transporterId], references: [id], onDelete: Cascade)
+  status          AssignmentStatus @default(PENDING)
+  assignedAt      DateTime         @default(now())
+  respondedAt     DateTime?
+  rejectionReason String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([enquiryId])
+  @@index([enquiryId, status])
+  @@index([transporterId])
+  @@index([transporterId, status])
+  @@index([status])
+}
+
+model Trip {
+  id              String     @id @default(cuid())
+  tripNumber      String     @unique // TRIP-YYYYMMDD-XXXX
+  enquiryId       String
+  enquiry         Enquiry    @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  transporterId   String
+  transporter     User       @relation("TransporterTrips", fields: [transporterId], references: [id], onDelete: Cascade)
+  vehicleId       String?
+  vehicle         Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  
+  status          TripStatus @default(ASSIGNED)
+  pickupTime      DateTime?
+  inTransitTime   DateTime?
+  destinationTime DateTime?
+  deliveryTime    DateTime?
+  
+  startOdometer   Decimal?   @db.Decimal(10, 2)
+  endOdometer     Decimal?   @db.Decimal(10, 2)
+  notes           String?
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  payments        Payment[]
+
+  @@index([enquiryId])
+  @@index([enquiryId, status])
+  @@index([transporterId])
+  @@index([transporterId, status])
+  @@index([transporterId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model ReturnLoad {
+  id            String    @id @default(cuid())
+  enquiryId     String
+  enquiry       Enquiry   @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  fromLocation  String
+  toLocation    String
+  availableDate DateTime
+  isAvailable   Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([fromLocation, toLocation])
+  @@index([isAvailable])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  receiptNumber  String        @unique // PAY-YYYYMMDD-XXXX
+  enquiryId      String
+  enquiry        Enquiry       @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  tripId         String?
+  trip           Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  
+  amount         Decimal       @db.Decimal(10, 2)
+  paymentMethod  PaymentMethod @default(CASH)
+  paymentStatus  PaymentStatus @default(PENDING)
+  
+  transactionId  String?       @unique
+  idempotencyKey String?       @unique
+  paidAt         DateTime?
+  recordedBy     String?       // User ID of Admin or Transporter who recorded payment
+  notes          String?
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([enquiryId])
+  @@index([tripId])
+  @@index([paymentStatus])
+}
+
+model MandiPrice {
+  id          String   @id @default(cuid())
+  mandiName   String   // e.g. Khanna Mandi, Abohar Mandi
+  productName String   // e.g. Wheat, Paddy, Cotton
+  price       Decimal? @db.Decimal(10, 2)
+  unit        String   @default("Quintal") // Quintal, Kg, Tonne
+  isActive    Boolean  @default(true)
+  
+  grades      MandiPriceGrade[]
+
+  adminId     String
+  admin       User     @relation("AdminMandiPrices", fields: [adminId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([mandiName, productName])
+  @@index([isActive])
+  @@index([isActive, updatedAt(sort: Desc)])
+}
+
+model MandiPriceGrade {
+  id           String     @id @default(cuid())
+  mandiPriceId String
+  mandiPrice   MandiPrice @relation(fields: [mandiPriceId], references: [id], onDelete: Cascade)
+  gradeName    String     // e.g. Grade A, Grade B, Grade C, Super
+  minPrice     Decimal    @db.Decimal(10, 2)
+  maxPrice     Decimal    @db.Decimal(10, 2)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([mandiPriceId])
+}
+
+model EnquiryStatusHistory {
+  id         String         @id @default(cuid())
+  enquiryId  String
+  enquiry    Enquiry        @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  fromStatus EnquiryStatus?
+  toStatus   EnquiryStatus
+  actorId    String?
+  actorRole  UserRole?
+  notes      String?
+  createdAt  DateTime       @default(now())
+
+  @@index([enquiryId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  UserRole?
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+  entityType String   // ENQUIRY, PRICING, TRIP, PAYMENT, USER, MANDI_PRICE
+  entityId   String
+  action     String   // CREATE, UPDATE_STATUS, SET_PRICE, ASSIGN_TRANSPORTER, DELETE
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  requestId  String?
+  timestamp  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@index([actorId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(SYSTEM)
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  readAt    DateTime?
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([isRead])
+}
