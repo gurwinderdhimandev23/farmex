@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Enquiry } from "@/types/api";
 import { EnquiryStatusBadge } from "./EnquiryStatusBadge";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { getEnquiryRouteDistance } from "@/lib/pricing-utils";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   MapPin,
@@ -28,6 +29,7 @@ const ShipmentRouteCardComponent: React.FC<ShipmentRouteCardProps> = ({
   actionButton,
 }) => {
   const { t } = useLanguage();
+  const routeDist = getEnquiryRouteDistance(enquiry);
   const assignedTrip = enquiry.trips && enquiry.trips.length > 0 ? enquiry.trips[0] : null;
   const assignedTransporter = assignedTrip?.transporter || enquiry.assignments?.[0]?.transporter || (enquiry as any).assignedTransporter;
 
@@ -95,12 +97,12 @@ const ShipmentRouteCardComponent: React.FC<ShipmentRouteCardProps> = ({
             <span className="font-bold text-white truncate">{enquiry.pickupLocation}</span>
           </div>
 
-          {/* Dotted Arrow */}
+          {/* Dotted Arrow with Exact Route Distance */}
           <div className="flex-1 px-3 flex items-center justify-center">
             <div className="w-full border-t-2 border-dashed border-emerald-500/40 relative flex items-center justify-center">
-              <div className="absolute bg-slate-900 px-2 py-0.5 rounded-full border border-emerald-500/30 text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+              <div className="absolute bg-slate-900 px-2.5 py-0.5 rounded-full border border-emerald-500/30 text-[10px] font-bold text-emerald-300 flex items-center gap-1">
                 <Truck className="w-3 h-3 text-emerald-400" />
-                <span className="hidden sm:inline">Direct</span>
+                <span>{routeDist} KM</span>
               </div>
             </div>
           </div>

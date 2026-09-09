@@ -155,20 +155,60 @@ export interface UpfrontQuoteBreakdown {
 }
 
 /**
+ * Resolves the actual trip distance (KM) between pickup and destination
+ */
+export function getEnquiryRouteDistance(enq: Enquiry): number {
+  // 1. First check if distance was explicitly recorded in the upfront quote tag in notes
+  const distMatch = enq.notes?.match(/Distance:\s*([\d.]+)\s*KM/i);
+  if (distMatch && !isNaN(parseFloat(distMatch[1]))) {
+    return Math.round(parseFloat(distMatch[1]));
+  }
+
+  // 2. If pickup and destination coordinates exist, calculate actual road distance
+  const pLat = enq.pickupLatitude !== undefined && enq.pickupLatitude !== null ? Number(enq.pickupLatitude) : null;
+  const pLng = enq.pickupLongitude !== undefined && enq.pickupLongitude !== null ? Number(enq.pickupLongitude) : null;
+  const dLat = enq.destinationLatitude !== undefined && enq.destinationLatitude !== null ? Number(enq.destinationLatitude) : null;
+  const dLng = enq.destinationLongitude !== undefined && enq.destinationLongitude !== null ? Number(enq.destinationLongitude) : null;
+
+  if (pLat !== null && pLng !== null && dLat !== null && dLng !== null) {
+    const R = 6371; // Earth's radius in KM
+    const dLatRad = ((dLat - pLat) * Math.PI) / 180;
+    const dLonRad = ((dLng - pLng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLatRad / 2) * Math.sin(dLatRad / 2) +
+      Math.cos((pLat * Math.PI) / 180) *
+        Math.cos((dLat * Math.PI) / 180) *
+        Math.sin(dLonRad / 2) *
+        Math.sin(dLonRad / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const straightDist = R * c;
+    return Math.max(5, Math.round(straightDist * 1.25));
+  }
+
+  // 3. Fallback to reasonable distance
+  return 25;
+}
+
+/**
  * Get upfront quote for an enquiry, using saved note or Farm_EX.xlsx master calculation
  */
 export function getEnquiryUpfrontQuote(enq: Enquiry): UpfrontQuoteBreakdown {
-  // Check if saved upfront quote tag exists in notes: [Upfront Quote: Total ₹... | Transport: ₹... | Labour: ₹... | Distance: ... KM]
-  const quoteMatch = enq.notes?.match(
-    /\[Upfront Quote: Total ₹(\d+) \| Transport: ₹(\d+) \| Labour: ₹(\d+) \| Distance: (\d+) KM\]/
-  );
-  if (quoteMatch) {
-    const total = parseInt(quoteMatch[1], 10);
-    const transport = parseInt(quoteMatch[2], 10);
-    const labour = parseInt(quoteMatch[3], 10);
-    const dist = parseInt(quoteMatch[4], 10);
+  // 1. Flexible regex to extract saved upfront quote from notes
+  // Format: [Upfront Quote: Total ₹... | Transport: ₹... | Labour...: ₹... | Distance: ... KM | Vehicle: ...]
+  const totalMatch = enq.notes?.match(/Total\s*₹(\d+)/i);
+  const transportMatch = enq.notes?.match(/Transport:\s*₹(\d+)/i);
+  const labourMatch = enq.notes?.match(/Labour[^:]*:\s*₹(\d+)/i);
+  const distMatch = enq.notes?.match(/Distance:\s*([\d.]+)\s*KM/i);
+  const vehicleMatch = enq.notes?.match(/Vehicle:\s*([^\]]+)/i);
+
+  if (totalMatch && transportMatch) {
+    const total = parseInt(totalMatch[1], 10);
+    const transport = parseInt(transportMatch[1], 10);
+    const labour = labourMatch ? parseInt(labourMatch[1], 10) : 0;
+    const dist = distMatch ? Math.round(parseFloat(distMatch[1])) : getEnquiryRouteDistance(enq);
     const platformFee = Math.round(transport * 0.15);
     const driverPayout = transport - platformFee;
+    const vehicleName = vehicleMatch ? vehicleMatch[1].trim() : (enq.vehicleRequirement ?? undefined);
 
     return {
       totalAmount: total,
@@ -176,14 +216,15 @@ export function getEnquiryUpfrontQuote(enq: Enquiry): UpfrontQuoteBreakdown {
       labourPrice: labour,
       distanceKm: dist,
       fromNote: true,
+      vehicleName,
       platformFee,
       driverPayout,
     };
   }
 
-  // Calculate using Farm_EX.xlsx rate card
+  // 2. Calculate using exact route distance (pickup to destination)
   const weightQuintals = Math.max(0.1, Number(enq.quantityKg) / 100);
-  const dist = enq.distanceFromRewariKm ? Number(enq.distanceFromRewariKm) : 20;
+  const dist = getEnquiryRouteDistance(enq);
 
   const bestQuote = getBestVehicleQuote(weightQuintals, dist);
   const transport = bestQuote.totalFreight;

@@ -39,6 +39,12 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class UserNotFoundError extends AppError {
+  constructor(message: string = 'User not found with this phone number') {
+    super(message, HTTP_STATUS.NOT_FOUND, 'USER_NOT_FOUND');
+  }
+}
+
 export class ConflictError extends AppError {
   constructor(message: string = 'Resource conflict') {
     super(message, HTTP_STATUS.CONFLICT, 'CONFLICT');

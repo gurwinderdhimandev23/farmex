@@ -521,10 +521,10 @@ export const EnquiryForm: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-emerald-500/30 pb-4">
           <div>
             <span className="text-xs font-extrabold tracking-wider text-emerald-400 uppercase bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30">
-              ⚡ {language === "hi" ? "आधिकारिक किराया सूची (Rate Card)" : "Official Freight Rate Card"}
+              ⚡ {language === "hi" ? "तय अंतिम किराया (Final Fixed Rates)" : "Transparent Vehicle Rates"}
             </span>
             <h3 className="text-2xl font-black text-white mt-1">
-              {language === "hi" ? "गाड़ियों का अनुमानित किराया व विवरण" : "Vehicle Freight Breakdown"}
+              {language === "hi" ? "गाड़ी चुनें व कुल किराया देखें" : "Select Vehicle & Final Rate"}
             </h3>
           </div>
           <div className="text-right">
@@ -574,7 +574,7 @@ export const EnquiryForm: React.FC = () => {
                         setSelectedVehicleCategory(v.category);
                       }
                     }}
-                    className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col justify-between relative ${
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col justify-between relative ${
                       !v.isEligible
                         ? "bg-slate-950/40 border-slate-800 opacity-40 cursor-not-allowed select-none"
                         : isSelected
@@ -618,29 +618,25 @@ export const EnquiryForm: React.FC = () => {
                         </span>
                       </div>
 
-                      <p className="text-[11px] text-slate-300 font-medium mb-2">
+                      <p className="text-[11px] text-slate-300 font-medium mb-3">
                         {language === "hi"
                           ? `क्षमता: ${v.capacityMinQtl}–${v.capacityMaxQtl} क्विंटल`
                           : `Cap: ${v.capacityMinQtl}–${v.capacityMaxQtl} Qtl`}
                       </p>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800/80 space-y-1 text-xs">
-                      <div className="flex justify-between text-slate-300">
-                        <span>{language === "hi" ? "मूल किराया:" : "Base Rate:"}</span>
-                        <span className="font-bold text-white">₹{v.basicFreight}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-300">
-                        <span>{language === "hi" ? `दूरी (${numDist} KM):` : `Distance (${numDist} KM):`}</span>
-                        <span className="font-bold text-white">₹{v.distanceCharges}</span>
-                      </div>
-                      <div
-                        className={`flex justify-between font-black pt-1.5 border-t border-slate-800 text-sm ${
-                          isSelected ? "text-emerald-300" : "text-slate-200"
-                        }`}
-                      >
-                        <span>{language === "hi" ? "कुल भाड़ा:" : "Total Freight:"}</span>
-                        <span>₹{v.totalFreight}</span>
+                    {/* Single Final Rate Tag (No Bifurcation) */}
+                    <div className="pt-3 border-t border-slate-800/80">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        {language === "hi" ? "कुल अंतिम किराया" : "Total Final Rate"}
+                      </span>
+                      <div className="flex items-baseline justify-between mt-0.5">
+                        <span className={`text-2xl font-black ${isSelected ? "text-emerald-400" : "text-white"}`}>
+                          ₹{v.totalFreight}
+                        </span>
+                        <span className="text-[10px] font-semibold text-emerald-300/80">
+                          {language === "hi" ? "तय किराया" : "Fixed Fare"}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -650,18 +646,20 @@ export const EnquiryForm: React.FC = () => {
           </div>
         )}
 
-        {/* Summary Pill */}
+        {/* Summary Pill (Clean Final Overview) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div className="bg-slate-950/80 p-3 rounded-xl border border-emerald-500/20 flex items-center justify-between">
             <span className="text-xs text-emerald-300 font-bold">{t("labourCharge")}</span>
             <span className="text-sm font-black text-white">
-              {hasEnteredSpecs ? (labourRequired ? `₹${liveLabourPrice} (${labourCount || 1} ${language === "hi" ? "मजदूर" : "workers"})` : "₹0") : "—"}
+              {hasEnteredSpecs ? (labourRequired ? `₹${liveLabourPrice} (${labourCount || 1} ${language === "hi" ? "मजदूर" : "workers"})` : language === "hi" ? "शामिल नहीं" : "Not added") : "—"}
             </span>
           </div>
 
           <div className="bg-slate-950/80 p-3 rounded-xl border border-emerald-500/20 flex items-center justify-between">
-            <span className="text-xs text-emerald-300 font-bold">{language === "hi" ? "प्लेटफॉर्म शुल्क" : "Platform Margin"}</span>
-            <span className="text-sm font-black text-amber-400">15% {language === "hi" ? "शामिल" : "Included"}</span>
+            <span className="text-xs text-emerald-300 font-bold">{language === "hi" ? "किराया गारंटी" : "Price Guarantee"}</span>
+            <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
+              ✓ {language === "hi" ? "100% तय किराया (नो हिडन चार्ज)" : "100% Fixed & Transparent"}
+            </span>
           </div>
 
           <div className="bg-slate-950/80 p-3 rounded-xl border border-emerald-500/20 flex items-center justify-between">
@@ -674,14 +672,16 @@ export const EnquiryForm: React.FC = () => {
 
         {/* Additional Notes */}
         <div>
-          <label className="block text-xs font-bold text-emerald-300 mb-1">
-            {t("specialNotes")}
+          <label className="block text-xs font-bold text-emerald-300 mb-1.5 flex items-center gap-1.5">
+            <span>📝</span> {t("specialNotes")}
           </label>
           <Textarea
+            variant="dark"
             placeholder={t("notesPlaceholder")}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="bg-slate-950/90 border border-emerald-500/30 text-white text-sm"
+            rows={3}
+            className="bg-slate-950 text-white placeholder:text-slate-400 border-emerald-500/40 focus:border-emerald-400 focus:bg-slate-900 focus:text-white font-medium text-sm"
           />
         </div>
       </div>

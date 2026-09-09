@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "../hooks/useAuth";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +14,24 @@ import { cn } from "@/lib/utils";
 type PublicRegisterRole = "FARMER" | "TRANSPORTER";
 
 export const RegisterForm: React.FC = () => {
+  const searchParams = useSearchParams();
+  const initialPhone = searchParams?.get("phone") || "";
   const { register, isLoading } = useAuth();
   const [role, setRole] = useState<PublicRegisterRole>("FARMER");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(initialPhone.replace(/\D/g, "").slice(0, 10));
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const qPhone = searchParams?.get("phone");
+    if (qPhone) {
+      const cleanPhone = qPhone.replace(/\D/g, "").slice(0, 10);
+      if (cleanPhone) {
+        setPhone(cleanPhone);
+      }
+    }
+  }, [searchParams]);
 
   // Address & Coordinates
   const [address, setAddress] = useState("");

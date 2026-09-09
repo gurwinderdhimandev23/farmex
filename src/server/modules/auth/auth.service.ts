@@ -2,7 +2,7 @@ import { AuthRepository } from './auth.repository';
 import { RegisterInput, LoginInput, ChangePasswordInput } from './auth.schema';
 import { hashPassword, verifyPassword, generateRandomToken, hashToken } from '../../shared/utils/crypto.utils';
 import { generateAccessToken } from '../../shared/utils/token.utils';
-import { ConflictError, AuthenticationError, NotFoundError } from '../../shared/errors/app-error';
+import { ConflictError, AuthenticationError, NotFoundError, UserNotFoundError } from '../../shared/errors/app-error';
 
 export class AuthService {
   private authRepository: AuthRepository;
@@ -59,7 +59,7 @@ export class AuthService {
   async login(input: LoginInput, userAgent?: string, ipAddress?: string) {
     const user = await this.authRepository.findUserByPhone(input.phone);
     if (!user || user.deletedAt !== null) {
-      throw new AuthenticationError('Invalid phone number or password');
+      throw new UserNotFoundError('No account found with this phone number');
     }
 
     if (!user.isActive) {

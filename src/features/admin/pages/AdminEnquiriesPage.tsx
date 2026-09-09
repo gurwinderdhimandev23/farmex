@@ -13,6 +13,7 @@ import { EnquiryStatusBadge } from "@/features/enquiries/components/EnquiryStatu
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { getEnquiryRouteDistance } from "@/lib/pricing-utils";
 import { Search, CheckCircle2, XCircle, IndianRupee, Truck, MapPin, Calendar, UserCheck, AlertCircle, Phone, AlertTriangle, Package, FlaskConical } from "lucide-react";
 import { DocumentUploader } from "@/components/ui/DocumentUploader";
 
@@ -153,9 +154,12 @@ export const AdminEnquiriesPage: React.FC = () => {
                         🌾 Ghar Se Beche
                       </span>
                     )}
-                    {enq.distanceFromRewariKm && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300 flex items-center gap-1">
-                        📍 {enq.distanceFromRewariKm} KM from Rewari Hub
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300 flex items-center gap-1">
+                      📍 {getEnquiryRouteDistance(enq)} KM Route
+                    </span>
+                    {enq.isSellFromFarm && enq.distanceFromRewariKm && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                        🏢 {enq.distanceFromRewariKm} KM to Lab Hub
                       </span>
                     )}
                     {enq.isSellFromFarm && enq.sampleStatus && (

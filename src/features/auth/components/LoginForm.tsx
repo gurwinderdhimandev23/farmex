@@ -2,12 +2,15 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../hooks/useAuth";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Phone, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 
 export const LoginForm: React.FC = () => {
+  const router = useRouter();
   const { login, isLoading } = useAuth();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -32,9 +35,18 @@ export const LoginForm: React.FC = () => {
       return;
     }
 
-    const success = await login({ phone: phone.trim(), password });
-    if (!success) {
-      setError("Invalid phone number or password. Please try again.");
+    const res = await login({ phone: phone.trim(), password });
+    if (!res.success) {
+      if (res.errorCode === "USER_NOT_FOUND") {
+        toast.info("No account found with this number. Redirecting to registration...", {
+          duration: 3000,
+        });
+        router.push(`/register?phone=${encodeURIComponent(phone.trim())}`);
+        return;
+      }
+      const msg = res.errorMessage || "Invalid phone number or password. Please try again.";
+      setError(msg);
+      toast.error(msg);
     }
   };
 

@@ -6,11 +6,17 @@ import { User, UserRole, AuthResponseData } from "@/types/api";
 import { getData, postData, tokenStorage, ENDPOINTS } from "@/lib/api-client";
 import { LoginPayload, RegisterPayload } from "../types";
 
+export interface AuthResult {
+  success: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (payload: LoginPayload) => Promise<boolean>;
+  login: (payload: LoginPayload) => Promise<AuthResult>;
   register: (payload: RegisterPayload) => Promise<boolean>;
   logout: () => Promise<void>;
   hasRole: (role: UserRole | UserRole[]) => boolean;
@@ -54,11 +60,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, [refreshUser]);
 
-  const login = useCallback(async (payload: LoginPayload): Promise<boolean> => {
+  const login = useCallback(async (payload: LoginPayload): Promise<AuthResult> => {
     setIsLoading(true);
     try {
       const res = await postData<AuthResponseData>(ENDPOINTS.AUTH.LOGIN, payload, {
         showSuccessToast: "Welcome back!",
+        showErrorToast: false,
       });
       const accessToken = res.data?.tokens?.accessToken || res.data?.accessToken;
       const refreshToken = res.data?.tokens?.refreshToken || res.data?.refreshToken;
@@ -70,9 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         else if (role === "TRANSPORTER") router.push("/transporter");
         else if (role === "ADMIN") router.push("/admin");
         else router.push("/");
-        return true;
+        return { success: true };
       }
-      return false;
+      return {
+        success: false,
+        errorCode: res.error?.code,
+        errorMessage: res.error?.message,
+      };
     } finally {
       setIsLoading(false);
     }

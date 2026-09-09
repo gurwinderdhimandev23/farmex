@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { EnquiryStatusBadge } from "./EnquiryStatusBadge";
 import { EnquiryTimeline } from "./EnquiryTimeline";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { getEnquiryRouteDistance } from "@/lib/pricing-utils";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   MapPin,
@@ -27,6 +28,7 @@ interface EnquiryDetailsCardProps {
 
 const EnquiryDetailsCardComponent: React.FC<EnquiryDetailsCardProps> = ({ enquiry, actionButtons }) => {
   const { t } = useLanguage();
+  const routeDist = getEnquiryRouteDistance(enquiry);
   const activeAssignment = enquiry.assignments?.find((a) => a.status === "ACCEPTED") || enquiry.assignments?.[0];
   const activeTrip = enquiry.trips?.[0];
   const assignedTransporter = activeAssignment?.transporter || activeTrip?.transporter;
@@ -85,6 +87,11 @@ const EnquiryDetailsCardComponent: React.FC<EnquiryDetailsCardProps> = ({ enquir
               <div>
                 <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">{t("destinationLocation")}</span>
                 <p className="text-sm font-bold text-slate-900 mt-0.5">{enquiry.destinationLocation}</p>
+                <div className="flex items-center gap-2 text-xs text-slate-600 mt-2">
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    📍 {routeDist} KM Route
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -127,30 +134,25 @@ const EnquiryDetailsCardComponent: React.FC<EnquiryDetailsCardProps> = ({ enquir
             </div>
           </div>
 
-          {/* Pricing Summary */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border border-emerald-200/80">
-            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          {/* Pricing Summary (Single Final Rate) */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/90 to-teal-50/50 border border-emerald-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
-                <IndianRupee className="w-4 h-4 text-emerald-600" /> {t("pricingBreakdown")}
+                <IndianRupee className="w-4 h-4 text-emerald-600" /> {t("estimatedPrice")}
               </h4>
+              <p className="text-xs text-slate-500 mt-1">
+                {enquiry.vehicleRequirement || "Matched Vehicle"} • {enquiry.labourRequired ? (t("labourYes")) : (t("labourNo"))}
+              </p>
             </div>
 
             {enquiry.transportPricing ? (
-              <div className="grid grid-cols-3 gap-3 pt-1">
-                <div>
-                  <span className="text-[10px] text-slate-500 font-medium">{t("transportCharge")}</span>
-                  <p className="text-sm font-bold text-slate-900">{formatCurrency(enquiry.transportPricing.transportPrice)}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 font-medium">{t("labourCharge")}</span>
-                  <p className="text-sm font-bold text-slate-900">{formatCurrency(enquiry.transportPricing.labourPrice)}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-emerald-800 font-bold">{t("estimatedPrice")}</span>
-                  <p className="text-base font-extrabold text-emerald-700">
-                    {formatCurrency(enquiry.transportPricing.totalAmount)}
-                  </p>
-                </div>
+              <div className="text-left sm:text-right">
+                <p className="text-2xl sm:text-3xl font-black text-emerald-700">
+                  {formatCurrency(enquiry.transportPricing.totalAmount)}
+                </p>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full mt-1">
+                  ✓ {t("upfrontGuaranteedBadge")}
+                </span>
               </div>
             ) : (
               <p className="text-xs text-slate-600">

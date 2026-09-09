@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { RegisterForm } from "../components/RegisterForm";
-import { Truck, Sparkles } from "lucide-react";
+import { Truck, Sparkles, Loader2 } from "lucide-react";
 
 export const RegisterPage: React.FC = () => {
   return (
@@ -29,7 +29,16 @@ export const RegisterPage: React.FC = () => {
             </span>
           </div>
 
-          <RegisterForm />
+          <Suspense
+            fallback={
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+                <span className="text-xs font-medium">Loading registration form...</span>
+              </div>
+            }
+          >
+            <RegisterForm />
+          </Suspense>
         </div>
       </div>
     </div>
